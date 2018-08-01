@@ -1,0 +1,403 @@
+<?php
+/**
+ * Implements hook_form_FORM_ID_alter().
+ * Form ID: media_add_upload_multiple
+ * Media module form with Plupload (Find content > Media > Add file)
+ */
+function eatlas_media_browser_plus_fixes_form_media_add_upload_multiple_alter(&$form, &$form_state) {
+	_eatlas_media_browser_plus_fixes_add_image_extra_fields($form, $form_state, TRUE);
+	_eatlas_media_browser_plus_fixes_set_default_values($form, $form_state);
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ * Form ID: media_add_upload
+ * Media module form without Plupload (Find content > Media > Add file)
+ *     it's also the form when adding image from CKEditor.
+ */
+function eatlas_media_browser_plus_fixes_form_media_add_upload_alter(&$form, &$form_state) {
+	_eatlas_media_browser_plus_fixes_add_image_extra_fields($form, $form_state);
+	_eatlas_media_browser_plus_fixes_set_default_values($form, $form_state);
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ * Form ID: media_internet_add
+ * I don't know where this is used, but Media browser plus implement
+ *     that hook so it is probably useful.
+ */
+function eatlas_media_browser_plus_fixes_form_media_internet_add_alter(&$form, &$form_state) {
+	_eatlas_media_browser_plus_fixes_add_image_extra_fields($form, $form_state);
+	_eatlas_media_browser_plus_fixes_set_default_values($form, $form_state);
+}
+
+
+/**
+ * Change the default CKEditor default format.
+ *
+ * @param array $form
+ *   An array representing the form that the element will be attached to.
+ *
+ * @param string $field_name
+ *   The internal name of the CKEditor field.
+ *
+ * @param string $format
+ *   The internal name of the text format.
+ *     filtered_html
+ *     full_html
+ *     plain_text
+ *     php_code
+ *
+ * @see admin/config/content/formats
+ */
+function _eatlas_media_browser_plus_fixes_set_ckeditor_default_format(&$form, $field_name, $format) {
+	if (isset($form[$field_name])) {
+		$lang = LANGUAGE_NONE;
+		for ($i=0; $i<=$form[$field_name][$lang]['#max_delta']; $i++) {
+			$form[$field_name][$lang][$i]['#format'] = $format;
+		}
+	}
+}
+
+// The field_group module simply create field sets. That's what we are doing here.
+function eatlas_media_browser_plus_fixes_move_fields_to_group(&$form, $multiple_upload = FALSE) {
+	if (module_exists('field_group')) {
+		// Name of the group, as defined in the image form.
+		$group_name = 'group_description';
+
+		// Get the existing field group (defined by the field_group module),
+		// from the "edit image" form to get the field group label,
+		// child fields, etc.
+		$image_group = field_group_load_field_group($group_name, 'file', 'image', 'form');
+
+		if (!empty($image_group)) {
+			// Create the fieldset in the current form, if it doesn't
+			// already exists.
+			if (!isset($form[$group_name])) {
+				$new_group = array();
+				$new_group[$group_name] = array(
+					'#type' => 'fieldset',
+					'#title' => $image_group->label,
+					'#collapsible' => TRUE,
+					'#collapsed' => !!$multiple_upload,
+				);
+
+				eatlas_commons_form_add_field($form, $new_group, 1);
+			}
+
+			// Fix the weights to be sure there is no weight clash.
+			// This is done to ensure the field order do not get messed
+			// up after been moved into the fieldset.
+			eatlas_commons_fix_form_weights($form);
+
+			// Move the fields into the field group
+			foreach($image_group->children as $field_name) {
+				if (isset($form[$field_name])) {
+					$form[$group_name][$field_name] = $form[$field_name];
+					unset($form[$field_name]);
+				}
+			}
+		}
+
+
+
+
+		// Name of the group, as defined in the image form.
+		$group_name = 'group_advanced';
+
+		// Get the existing field group (defined by the field_group module),
+		// from the "edit image" form to get the field group label,
+		// child fields, etc.
+		$image_group = field_group_load_field_group($group_name, 'file', 'image', 'form');
+
+		if (!empty($image_group)) {
+			// Create the fieldset in the current form, if it doesn't
+			// already exists.
+			if (!isset($form[$group_name])) {
+				$new_group = array();
+				$new_group[$group_name] = array(
+					'#type' => 'fieldset',
+					'#title' => $image_group->label,
+					'#collapsible' => TRUE,
+					'#collapsed' => TRUE,
+				);
+
+				eatlas_commons_form_add_field($form, $new_group);
+			}
+
+			// Fix the weights to be sure there is no weight clash.
+			// This is done to ensure the field order do not get messed
+			// up after been moved into the fieldset.
+			eatlas_commons_fix_form_weights($form);
+
+			// Move the fields into the field group
+			foreach($image_group->children as $field_name) {
+				if (isset($form[$field_name])) {
+					$form[$group_name][$field_name] = $form[$field_name];
+					unset($form[$field_name]);
+				}
+			}
+		}
+	}
+}
+
+/**
+ * Add some fields to the "Add file" window, in the media browser
+ * module, to set value for all uploaded images.
+ * See: modules/media_browser_plus/media_browser_plus.module
+ *
+ * NOTE: All the fields are added after the default fields, but before
+ *   the branding fields, which is why a weight is provided for each of
+ *   them. The field_tags do not have a weight, so it needs to be placed
+ *   manually. This method take care of that at the end. This module has
+ *   a weight of 10, so the fields get positionned correctly.
+ *   (see eatlas_commons_form_add_field)
+ */
+function _eatlas_media_browser_plus_fixes_add_image_extra_fields(&$form, &$form_state, $multiple_upload = FALSE) {
+	global $user;
+	// Load user's custom fields
+	$account = user_load($user->uid);
+
+	// This module has to be run AFTER media_browser_plus hooks
+	// otherwise the field media_folder do not exists yet.
+	// media_browser_plus hooks:
+	//     media_browser_plus_form_media_internet_add_alter
+	//     media_browser_plus_form_media_add_upload_alter
+	//     media_browser_plus_form_media_add_upload_multiple_alter
+	// To ensure this method is called after the creation of the form,
+	// we set the "weight" of the module in the install file.
+	$field_media_folder = field_get_items('user', $account, 'field_media_folder');
+	if ($field_media_folder) {
+		$media_folder = $field_media_folder[0]['tid'];
+		$form['field_folder']['#default_value'] = $media_folder;
+	}
+
+	// Add the "No public page" field
+	eatlas_commons_form_add_field($form, eatlas_commons_get_image_field($form, $form_state, 'field_restricted_access'));
+
+
+	// Add the "Title" and "Body" field
+	$title_field = eatlas_commons_get_image_field($form, $form_state, 'media_title');
+	$title_field['media_title'][LANGUAGE_NONE][0]['value']['#description'] =
+			"Title of the uploaded image(s). Leave blank to use the title from the metadata of the image(s).";
+	eatlas_commons_form_add_field($form, $title_field);
+
+	$description_field = eatlas_commons_get_image_field($form, $form_state, 'media_description');
+	$description_field['media_description'][LANGUAGE_NONE][0]['#description'] =
+			"Description of the uploaded image(s). Leave blank to use the description from the metadata of the image(s).";
+	eatlas_commons_form_add_field($form, $description_field);
+
+	// Set CKEditor to use 'basic_html' format
+	// NOTE: The edition form will use the saved format.
+	_eatlas_media_browser_plus_fixes_set_ckeditor_default_format($form, 'media_description', 'basic_html');
+
+
+	// Retrieve the 'field_profile' setting for the current logged user
+	// (that's our default submitter)
+	$submitter = NULL;
+	$field_profile = field_get_items('user', $account, 'field_profile');
+	if ($field_profile) {
+		$submitter = $field_profile[0]['nid'];
+	}
+
+	// Add the submitter field, with a default value
+	$field_submitter = eatlas_commons_get_image_field($form, $form_state, 'field_submitter');
+	if (!empty($field_submitter) && $submitter !== NULL) {
+		$field_submitter['field_submitter'][LANGUAGE_NONE][0]['nid']['#default_value'] = $submitter;
+	}
+	eatlas_commons_form_add_field($form, $field_submitter);
+
+	// Add the project field
+	eatlas_commons_form_add_field($form, eatlas_commons_get_image_field($form, $form_state, 'field_project'));
+
+	// Add the related content field
+	eatlas_commons_form_add_field($form, eatlas_commons_get_image_field($form, $form_state, 'field_related_content'));
+
+	// Add the photo galleries field
+	eatlas_commons_form_add_field($form, eatlas_commons_get_image_field($form, $form_state, 'field_galleries'));
+
+	eatlas_media_browser_plus_fixes_reorder_default_fields($form);
+	eatlas_media_browser_plus_fixes_move_fields_to_group($form, $multiple_upload);
+
+	$form['#submit'][] = '_eatlas_media_browser_plus_fixes_add_image_extra_fields_submit';
+}
+
+function eatlas_media_browser_plus_fixes_reorder_default_fields(&$form) {
+	// Move the "field tags" at the end (just before the submit button)
+	if (isset($form['field_tags']) && isset($form['submit'])) {
+		$field_tags = &$form['field_tags'];
+		$submit_button = &$form['submit'];
+
+		// This should never happen... but just in case
+		if (!isset($submit_button['#weight'])) {
+			$submit_button['#weight'] = 100;
+		}
+
+		$field_tags['#weight'] = $submit_button['#weight'];
+		$submit_button['#weight']++;
+	}
+
+	// Move the "field_folder" and "upload" at the top of the form
+	if (isset($form['upload'])) {
+		$form['upload']['#weight'] = -2;
+	}
+	if (isset($form['field_folder'])) {
+		$form['field_folder']['#weight'] = -1;
+	}
+
+	unset($form['#sorted']);
+}
+
+function _eatlas_media_browser_plus_fixes_add_image_extra_fields_submit($form, &$form_state) {
+	// Save the values to the image
+	$restricted_access = $form_state['values']['field_restricted_access'];
+
+	$title = $form_state['values']['media_title'];
+	$title_value = eatlas_commons_get_form_field_values($form_state, 'media_title');
+
+	$description = $form_state['values']['media_description'];
+	$description_value = eatlas_commons_get_form_field_values($form_state, 'media_description');
+
+	$submitter = $form_state['values']['field_submitter'];
+	$submitter_value = eatlas_commons_get_form_field_values($form_state, 'field_submitter');
+
+	$projects = $form_state['values']['field_project'];
+	$projects_value = eatlas_commons_get_form_field_values($form_state, 'field_project');
+
+	$related_contents = $form_state['values']['field_related_content'];
+	$related_contents_value = eatlas_commons_get_form_field_values($form_state, 'field_related_content');
+
+	$galleries = $form_state['values']['field_galleries'];
+	$galleries_value = eatlas_commons_get_form_field_values($form_state, 'field_galleries');
+
+	if ($restricted_access !== NULL ||
+			!empty($title_value) ||
+			!empty($description_value) ||
+			!empty($submitter_value) ||
+			!empty($projects_value) ||
+			!empty($related_contents_value) ||
+			!empty($galleries_value)) {
+
+		$fids = $form_state['redirect'][1]['query']['fid'];
+		if (!is_array($fids)) {
+			$fids = array($fids);
+		}
+		$media_entities = file_load_multiple($fids);
+
+		foreach ($media_entities as $media) {
+			if ($restricted_access !== NULL) {
+				$media->field_restricted_access = $restricted_access;
+			}
+			if (!empty($title_value)) {
+				$media->media_title = $title;
+			}
+			if (!empty($description_value)) {
+				$media->media_description = $description;
+			}
+			if (!empty($submitter_value)) {
+				$media->field_submitter = $submitter;
+			}
+			if (!empty($projects_value)) {
+				$media->field_project = $projects;
+			}
+			if (!empty($related_contents_value)) {
+				$media->field_related_content = $related_contents;
+			}
+			if (!empty($galleries_value)) {
+				$media->field_galleries = $galleries;
+			}
+			file_save($media);
+		}
+	}
+}
+
+
+/**
+ * Set the default value of "Media folder".
+ * See: modules/media_browser_plus/media_browser_plus.module
+ */
+function _eatlas_media_browser_plus_fixes_set_default_values(&$form, &$form_state) {
+	global $user;
+	// Load user's custom fields
+	$account = user_load($user->uid);
+
+	// This module has to be run AFTER media_browser_plus hooks
+	// otherwise the field media_folder do not exists yet.
+	// media_browser_plus hooks:
+	//     media_browser_plus_form_media_internet_add_alter
+	//     media_browser_plus_form_media_add_upload_alter
+	//     media_browser_plus_form_media_add_upload_multiple_alter
+	// To ensure that, we set the "weight" of the module in the install.
+	$field_media_folder = field_get_items('user', $account, 'field_media_folder');
+	if ($field_media_folder) {
+		$media_folder = $field_media_folder[0]['tid'];
+		$form['field_folder']['#default_value'] = $media_folder;
+	}
+}
+
+
+/**
+ * Properly move a directory with its children into a new filesystem
+ * location, and update all file references.
+ *
+ * @param $source string the current folder Drupal URI
+ * @param $destination string the Drupal URI we want the folder moved to
+ * NOTE: Drupal URI are the path that starts with the "public" protocol.
+ *     Example: public://eatlas/maps/qld.jpg
+ *
+ * IMPORTANT: After installing this module, you have to modify the
+ *     "Media browser plus" module to use it. See the README.txt file.
+ */
+function eatlas_media_browser_plus_fixes_folder_move($source, $destination) {
+	// File the file path (the real file path on the server, starting from the root)
+	$destination_realpath = drupal_realpath($destination);
+	$source_realpath = drupal_realpath($source);
+
+	// Create the destination folder if it doesn't exists.
+	if (!file_exists($destination_realpath)) {
+		// http://php.net/manual/en/function.mkdir.php
+		if (!mkdir($destination_realpath, 0777, TRUE)) {
+			// https://api.drupal.org/api/drupal/includes!filetransfer!filetransfer.inc/class/FileTransferException/7
+			throw new FileTransferException("Can not create the folder $destination_realpath");
+		}
+	}
+
+	// Move all files one by one, using Drupal "file_move" method which also manage Database references.
+	// http://php.net/manual/en/function.scandir.php
+	$files = scandir($source_realpath);
+	foreach($files as $file) {
+		if ($file !== '.' && $file !== '..') {
+			if (is_dir($source_realpath . DIRECTORY_SEPARATOR . $file)) {
+				// Recursive call for folders
+				eatlas_media_browser_plus_fixes_folder_move($source . DIRECTORY_SEPARATOR . $file, $destination . DIRECTORY_SEPARATOR . $file);
+			} else {
+				// Load file entity from URI
+				$query = new EntityFieldQuery();
+				$query->entityCondition('entity_type', 'file', '=')->propertyCondition('uri', $source . DIRECTORY_SEPARATOR . $file, '=');
+
+				$result = $query->execute();
+
+				if (isset($result['file'])) {
+					// I do a foreach, but there is no reason for having more than one file entity matching the URI.
+					foreach($result['file'] as $record) {
+						// Load the file object (I call it "$media" because that's how they call it in "media_browser_plus.module")
+						$media = file_load($record->fid);
+						// https://api.drupal.org/api/drupal/includes%21file.inc/function/file_move/7
+						file_move($media, $destination . DIRECTORY_SEPARATOR . $file);
+					}
+				}
+
+				// Move the file manually if it's not in the system (it has been copied manually maybe)
+				if (file_exists($source_realpath . DIRECTORY_SEPARATOR . $file)) {
+					rename($source_realpath . DIRECTORY_SEPARATOR . $file, $destination_realpath . DIRECTORY_SEPARATOR . $file);
+				}
+			}
+		}
+	}
+
+	// NOTE: rmdir only delete the folder if it's empty!
+	// http://php.net/manual/en/function.rmdir.php
+	rmdir($source_realpath);
+}
+
+?>

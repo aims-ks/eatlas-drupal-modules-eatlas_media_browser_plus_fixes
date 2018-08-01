@@ -1,0 +1,87 @@
+/* Fix issue with Media Browser Plus */
+
+.media-wrapper iframe,
+.media-modal-frame {
+	/* Set a safe height that avoid scroller, most of the time */
+	min-height: 2500px !important;
+	/* Remove padding that hide part of the window */
+	padding: 0.5em 0 !important;
+}
+
+body.page-media-browser {
+	/* Override the IFRAME body css directive that hide the scroller */
+	overflow: auto;
+}
+
+body.page-media-browser select {
+	max-width: 100%;
+}
+
+/* The Media browser module shows "Preview" and "Edit" button, which are broken */
+#media_buttons_preview,
+#media_buttons_edit {
+	display: none;
+}
+
+/**
+ * Media file - Mouse over the image filename change the layout (larger height)
+ *   The page seems to "jump" up and down as the mouse move over the labels.
+ *   It's very annonying... and it took me way too long to fix it, because they
+ *   messed around a lot of stuff they should not had touched.
+ *
+ * Errors are from media.css:
+ *   They tried to hide the label extra width by playing with "overflow" and
+ *   "display". Those attributes change the layout of the element (witdh / height),
+ *   which make the page "jumpy" as the mouse pass over / out the labels.
+ *   They "patched" it by setting some arbitrary negative margin here and there
+ *   until it looks "okay" in whatever browser / font they were using during
+ *   development.
+ *
+ *   The proper way to do this is to set the "overflow" to hidden and set
+ *   a width to the element to the parent width (100%). On mouse over,
+ *   ONLY CHANGE THE WIDTH to auto! This avoid awkward "jumpy" effects
+ *   in some (probably all) browsers. Alternatively, border may be added
+ *   for better visual appearance.
+ *
+ *   I had to reset all the element attributes they have been messing around
+ *   in order to fix it.
+ *
+ *   My ridiculously simple solution works with all browsers (even old version of IE)
+ *
+ * NOTE: This is a fix for the "media" module, not the
+ *   "media_browser_plus" module. I put it there because I didn't
+ *   want to create a module just for a bit of CSS.
+ */
+.media-item .label-wrapper {
+	/* Fix the "errors" they made in media.css */
+	margin: 0 !important; /* Remove media.css dirty margin hack */
+	display: inline-block !important; /* Set it to inline-block and LEAVE IT to inline-block */
+	line-height: 16px !important; /* Don't mess with line-height on hover! Set it once and LEAVE IT */
+
+	/* Set the width to parent width, to hide the label overflow */
+	width: 100%;
+}
+.media-item .label-wrapper .media-filename {
+	/* Fix the "errors" they made in media.css */
+	display: inline-block !important; /* Set it to inline-block and LEAVE IT to inline-block */
+
+	/* Set a border place holder (instead of messing around with margins) */
+	border: 1px solid transparent;
+}
+.media-item .label-wrapper:hover {
+	/* Fix the "errors" they made in media.css */
+	overflow: hidden !important; /* Don't mess around with overflow */
+	border: none !important; /* Border is irrelevent here */
+	margin: 0 !important; /* Remove media.css dirty margin hack */
+
+	/* Set the width, to show the entire label */
+	width: auto; /* This is the only thing that should had been set on this element */
+}
+.media-item .label-wrapper:hover .media-filename {
+	/* Fix the "errors" they made in media.css */
+	margin: 0 !important; /* Remove media.css dirty margin hack */
+	border: 1px solid #888 !important; /* NOTE: The border is already defined in media.css, but that may change in future versions. */
+
+	/* Remove the title underline, just to look prettier */
+	text-decoration: none;
+}

@@ -1,0 +1,14 @@
+; type: Supported values: project_module, project_theme_engine
+;   default: project_module
+;type = project_module
+
+; creator: Name of the developer(s) of the module (free text)
+creator = Gael Lafond
+
+; Bug fixes, New features & Security update: What has changed since last release (free text array)
+;   This variable is an array, one cell per element. Use "\n" for new lines.
+;   Those properties are used with release_notes and tags.
+;   See: https://www.drupal.org/documentation/releases/types
+;Security update[] = Now more secure\nand private.
+;Bug fixes[] = No more bug
+New features[] = Initial release

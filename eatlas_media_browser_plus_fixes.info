@@ -1,0 +1,21 @@
+; $Id$
+name = eAtlas Media browser plus fixes
+description = [eatlas_media_browser_plus_fixes] Fix issues in media browser plus, such as moving folders without database changes or hook invocation. *IMPORTANT* After installing this module, you have to modify the "Media browser plus" module to use it. See the README.txt file.
+core = 7.x
+
+files[] = eatlas_media_browser_plus_fixes.module
+
+stylesheets[all][] = css/eatlas_media_browser_plus_fixes.css
+
+package = eAtlas
+
+dependencies[] = eatlas_commons
+dependencies[] = media_browser_plus
+
+; NOTE: The "weight" is not supported in this file. See the install file for more details.
+
+; Attributes used by the update module.
+; There fields needs to be removed if the module is migrated to Drupal.org
+project status url = "http://drupal.eatlas.org.au/modules/eatlas"
+version = "7.x-1.0"
+project = "eatlas_media_browser_plus_fixes"
